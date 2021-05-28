@@ -36,12 +36,13 @@ type rabbitConfig struct {
 }
 
 type RabbitMqConn struct {
-	conn      *amqp.Connection
-	conf      *rabbitConfig
-	connErrCh chan *amqp.Error
-	chErrCh   chan *amqp.Error
-	publishCh *amqp.Channel
-	mt        sync.Mutex
+	conn           *amqp.Connection
+	conf           *rabbitConfig
+	connErrCh      chan *amqp.Error
+	chErrCh        chan *amqp.Error
+	publishCh      *amqp.Channel
+	publishDelayCh *amqp.Channel
+	mt             sync.Mutex
 }
 
 type MsgHandleFunc func(msg *amqp.Delivery)
@@ -66,12 +67,18 @@ func NewRabbitMqConn(rabbitUri string, exchangeName string, queueType string, op
 	if err != nil {
 		panicOnError(err, "fail to alloc channel")
 	}
+	publishDelayCh, err := conn.Channel()
+	if err != nil {
+		panicOnError(err, "fail to alloc delay channel")
+	}
+
 	cli = &RabbitMqConn{
-		conn:      conn,
-		conf:      rabbitConf,
-		connErrCh: make(chan *amqp.Error),
-		publishCh: publishCh,
-		mt:        sync.Mutex{},
+		conn:           conn,
+		conf:           rabbitConf,
+		connErrCh:      make(chan *amqp.Error),
+		publishCh:      publishCh,
+		publishDelayCh: publishDelayCh,
+		mt:             sync.Mutex{},
 	}
 
 	for _, opt := range opts {
@@ -249,10 +256,7 @@ func (this *RabbitMqConn) PublishDelay(msg interface{}, seconds int64) error {
 		return err
 	}
 
-	ch, err := this.conn.Channel()
-	failOnError(err, "Failed to open a channel")
-
-	err = ch.Publish(
+	err = this.publishDelayCh.Publish(
 		"",
 		this.conf.delayQueue, // routing key
 		false,                // mandatory
@@ -287,6 +291,7 @@ func (this *RabbitMqConn) reconnect() {
 		this.conn = mustConnRabbit(this.conf.uri)
 		this.connErrCh = this.conn.NotifyClose(make(chan *amqp.Error))
 		this.publishCh, _ = this.conn.Channel()
+		this.publishDelayCh, _ = this.conn.Channel()
 	}
 }
 
