@@ -1,6 +1,7 @@
 package rabbit
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/streadway/amqp"
-	"gitlab.yewifi.com/golden-cloud/common"
 )
 
 const Route_ALL string = "#"
@@ -219,7 +219,7 @@ fallback:
 }
 
 func (this *RabbitMqConn) Publish(routeKey string, msg interface{}) error {
-	msgByte, err := common.Marshal(msg)
+	msgByte, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,7 @@ func (this *RabbitMqConn) Publish(routeKey string, msg interface{}) error {
 }
 
 func (this *RabbitMqConn) PublishDelay(msg interface{}, seconds int64) error {
-	msgByte, err := common.Marshal(msg)
+	msgByte, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
